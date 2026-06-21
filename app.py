@@ -366,6 +366,7 @@ st.caption(
     "It is not financial advice and does not represent real personal holdings. "
     "Prices and 52-week ranges refresh from Yahoo Finance."
 )
+st.caption("Built by Dazlin · Python, Streamlit, Pandas, Plotly, Yahoo Finance")
 
 holdings, master = load_inputs()
 if st.button("Refresh market data"):
