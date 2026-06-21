@@ -43,7 +43,12 @@ POSITION_TYPE_CAPS = {
     "core": 1.0,
 }
 
-st.set_page_config(page_title="Portfolio Allocation Demo", page_icon="📊", layout="wide")
+st.set_page_config(
+    page_title="Portfolio Allocation Demo",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 
 def safe_float(value, default: float = 0.0) -> float:
@@ -355,8 +360,15 @@ def build_dca_recommendation(df: pd.DataFrame, budget: float) -> pd.DataFrame:
     scored["Post_DCA_Weight"] = (scored["Market_Value"] + scored["Suggested_Allocation"]) / (scored["Market_Value"].sum() + scored["Suggested_Allocation"].sum())
     return scored.sort_values(["Suggested_Allocation", "Adjusted_Score"], ascending=False)
 
+st.title("📊 Portfolio Allocation Demo Dashboard")
+st.caption(
+    "This public demo uses synthetic sample holdings and research assumptions. "
+    "It is not financial advice and does not represent real personal holdings. "
+    "Prices and 52-week ranges refresh from Yahoo Finance."
+)
+
 holdings, master = load_inputs()
-if st.sidebar.button("Refresh market data"):
+if st.button("Refresh market data"):
     fetch_market_data.clear()
 market = fetch_market_data(tuple(master["Yahoo_Ticker"].dropna().astype(str).unique()))
 portfolio = consolidate(holdings, master, market)
@@ -364,13 +376,6 @@ security_universe = build_security_universe(
     master,
     market,
     portfolio,
-)
-
-st.title("📊 Portfolio Allocation Demo Dashboard")
-st.caption(
-    "This public demo uses synthetic sample holdings and research assumptions. "
-    "It is not financial advice and does not represent real personal holdings. "
-    "Prices and 52-week ranges refresh from Yahoo Finance."
 )
 
 missing = portfolio[portfolio["Current_Price"].isna()]
