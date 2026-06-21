@@ -500,7 +500,7 @@ with dca_tab:
         "Unallocated_Due_To_Rounding": "${:,.2f}",
         "Post_DCA_Weight": "{:.1%}",
     }), use_container_width=True, hide_index=True)
-    st.info("The recommendation is decision support, not an automatic trade instruction. Review fair values, thesis changes, country-specific risks, and upcoming company events before placing orders.")
+    st.info("The recommendation is decision support, not an automatic trade instruction. Review fair values, thesis changes, position-specific risks, and upcoming market events before placing orders.")
 
 with analysis_tab:
     st.subheader("Position Analysis")
@@ -595,29 +595,29 @@ with analysis_tab:
 
     if moat_score >= 8:
         reasons.append(
-            "The company has a strong competitive moat."
+            "The holding has strong structural advantages."
         )
     elif moat_score <= 4:
         warnings.append(
-            "The competitive moat appears limited or uncertain."
+            "The moat or structural advantage appears limited or uncertain."
         )
 
     if quality_score >= 8:
         reasons.append(
-            "Business quality is rated highly."
+            "Quality is rated highly."
         )
     elif quality_score <= 4:
         warnings.append(
-            "Business quality is rated relatively low."
+            "Quality is rated relatively low."
         )
 
     if moat_trend.lower() == "weakening":
         warnings.append(
-            "The competitive moat is marked as weakening."
+            "The moat or structural advantage is marked as weakening."
         )
     elif moat_trend.lower() == "strengthening":
         reasons.append(
-            "The competitive moat appears to be strengthening."
+            "The moat or structural advantage appears to be strengthening."
         )
     
     decision_status = dca_decision_status(row)
@@ -703,7 +703,7 @@ with analysis_tab:
         elif decision_status == "hold":
             st.warning("**Hold / Wait**")
             st.write(
-                "The business remains acceptable, but the current price is "
+                "The holding remains acceptable, but the current price is "
                 "at or above your fair-value estimate. Wait for a better entry."
             )
 
