@@ -1,0 +1,11 @@
+Ticker,Name,Asset_Class,Sector,Country,Theme,Conviction,Fair_Value,Position_Type,Moat_Score,Moat_Trend,Quality_Score,Thesis_Status,Max_Weight,Yahoo_Ticker
+AAPL,Apple Inc.,Stock,Information Technology,USA,Consumer Devices / Services,8,245.00,Compounder,9,Stable,9,Active,0.05,AAPL
+MSFT,Microsoft Corporation,Stock,Information Technology,USA,Cloud / AI Infrastructure,9,520.00,Compounder,9,Strengthening,9,Active,0.22,MSFT
+NVDA,NVIDIA Corporation,Stock,Information Technology,USA,AI Semiconductors,8,190.00,Compounder,8,Strengthening,8,Active,0.28,NVDA
+AMZN,Amazon.com Inc.,Stock,Consumer Discretionary,USA,E-commerce / Cloud,7,230.00,Value,7,Stable,7,Active,0.16,AMZN
+KO,The Coca-Cola Company,Stock,Consumer Staples,USA,Defensive Compounder,7,70.00,Compounder,9,Stable,8,Active,0.12,KO
+JPM,JPMorgan Chase & Co.,Stock,Financials,USA,Banking / Financial Services,6,210.00,Value,7,Cyclical,7,Active,0.10,JPM
+PLTR,Palantir Technologies Inc.,Stock,Information Technology,USA,Data Analytics / AI,2,35.00,Speculative,4,Weakening,4,Active,0.05,PLTR
+VOO,Vanguard S&P 500 ETF,ETF,Broad Market,USA,Core Index ETF,6,560.00,Core,8,Stable,8,Active,0.30,VOO
+DIS,The Walt Disney Company,Stock,Communication Services,USA,Media / Parks Turnaround,5,115.00,Value,6,Unclear,6,Under Review,0.08,DIS
+COST,Costco Wholesale Corporation,Stock,Consumer Staples,USA,Quality Retail Watchlist,8,980.00,Compounder,9,Stable,9,Watchlist,0.12,COST
