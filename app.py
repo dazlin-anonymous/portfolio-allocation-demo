@@ -608,12 +608,12 @@ with analysis_tab:
     moat_trend = str(row.get("Moat_Trend", "Not set"))
     thesis_status = str(row.get("Thesis_Status", "Not set"))
 
-    is_etf = asset_class.lower() == "etf"
+    is_etf_security = asset_class.lower() == "etf"
     broad_index_etf = is_broad_index_etf(row)
-    subject_label = "fund" if is_etf else "company"
-    moat_label = "Exposure score" if is_etf else "Moat score"
-    moat_trend_label = "Exposure trend" if is_etf else "Moat trend"
-    quality_label = "Exposure quality" if is_etf else "Business quality"
+    subject_label = "fund" if is_etf_security else "company"
+    moat_label = "Exposure score" if is_etf_security else "Moat score"
+    moat_trend_label = "Exposure trend" if is_etf_security else "Moat trend"
+    quality_label = "Exposure quality" if is_etf_security else "Business quality"
 
     current_weight = safe_float(row.get("Current_Weight", 0))
     max_weight = safe_float(row.get("Max_Weight", 0))
@@ -665,7 +665,7 @@ with analysis_tab:
         )
 
     if moat_score >= 8:
-        if is_etf:
+        if is_etf_security:
             reasons.append(
                 "The ETF has attractive structural exposure."
             )
@@ -674,7 +674,7 @@ with analysis_tab:
                 "The company has a strong competitive moat."
             )
     elif moat_score <= 4:
-        if is_etf:
+        if is_etf_security:
             warnings.append(
                 "The ETF exposure appears limited or uncertain."
             )
@@ -693,7 +693,7 @@ with analysis_tab:
         )
 
     if moat_trend.lower() == "weakening":
-        if is_etf:
+        if is_etf_security:
             warnings.append(
                 "The ETF exposure trend is marked as weakening."
             )
@@ -702,7 +702,7 @@ with analysis_tab:
                 "The competitive moat is marked as weakening."
             )
     elif moat_trend.lower() == "strengthening":
-        if is_etf:
+        if is_etf_security:
             reasons.append(
                 "The ETF exposure trend appears to be improving."
             )
@@ -799,7 +799,7 @@ with analysis_tab:
 
         elif decision_status == "hold":
             st.warning("**Hold / Wait**")
-            if is_etf:
+            if is_etf_security:
                 st.write(
                     "The fund exposure remains acceptable, but the current price is "
                     "at or above your fair-value estimate. Wait for a better entry."
