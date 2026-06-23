@@ -43,6 +43,29 @@ POSITION_TYPE_CAPS = {
     "core": 1.0,
 }
 
+BROAD_INDEX_ETF_TICKERS = {
+    "ACWI",
+    "DIA",
+    "IVV",
+    "IWDA",
+    "QQQ",
+    "SPY",
+    "SPLG",
+    "VTI",
+    "VOO",
+    "VT",
+}
+
+BROAD_INDEX_KEYWORDS = {
+    "broad market",
+    "core etf",
+    "index",
+    "s&p 500",
+    "sp 500",
+    "total market",
+    "world",
+}
+
 st.set_page_config(
     page_title="Portfolio Allocation Demo",
     page_icon="📊",
@@ -63,6 +86,27 @@ def safe_float(value, default: float = 0.0) -> float:
 
 def normalize_text(value: object) -> str:
     return str(value or "").strip().lower()
+
+
+def is_etf(row: pd.Series) -> bool:
+    return normalize_text(row.get("Asset_Class", "")) == "etf"
+
+
+def is_broad_index_etf(row: pd.Series) -> bool:
+    if not is_etf(row):
+        return False
+
+    ticker = str(row.get("Ticker", "")).strip().upper()
+    yahoo_ticker = str(row.get("Yahoo_Ticker", "")).strip().upper()
+    if ticker in BROAD_INDEX_ETF_TICKERS or yahoo_ticker in BROAD_INDEX_ETF_TICKERS:
+        return True
+
+    searchable_text = " ".join(
+        str(row.get(column, ""))
+        for column in ["Name", "Sector", "Theme", "Position_Type"]
+    )
+    normalized_text = normalize_text(searchable_text)
+    return any(keyword in normalized_text for keyword in BROAD_INDEX_KEYWORDS)
 
 
 def dca_hard_stop_warnings(row: pd.Series) -> list[str]:
@@ -103,6 +147,8 @@ def dca_hard_stop_warnings(row: pd.Series) -> list[str]:
 def dca_decision_status(row: pd.Series) -> str:
     if dca_hard_stop_warnings(row):
         return "blocked"
+    if is_broad_index_etf(row):
+        return "eligible"
     if safe_float(row.get("Valuation_Upside", 0)) <= 0:
         return "hold"
     return "eligible"
@@ -301,6 +347,10 @@ def position_type_cap(position_type: str) -> float:
 def build_dca_recommendation(df: pd.DataFrame, budget: float) -> pd.DataFrame:
     scored = df.copy()
     scored["Valuation_Component"] = scored["Valuation_Upside"].clip(lower=-0.25, upper=0.60).add(0.25).div(0.85).clip(0, 1)
+    broad_index_etf = scored.apply(is_broad_index_etf, axis=1)
+    scored.loc[broad_index_etf, "Valuation_Component"] = (
+        scored.loc[broad_index_etf, "Valuation_Component"].clip(lower=0.50)
+    )
     scored["Technical_Component"] = scored["Technical_Discount"].fillna(0.5).clip(0, 1)
     scored["Conviction_Component"] = (scored["Conviction"] / 10).clip(0, 1)
     scored["Moat_Component"] = (scored["Moat_Score"] / 10).clip(0, 1)
@@ -329,7 +379,10 @@ def build_dca_recommendation(df: pd.DataFrame, budget: float) -> pd.DataFrame:
         axis=1,
     )
     scored["Adjusted_Score"] *= scored["Business_Quality_Multiplier"]
-    scored.loc[scored["Valuation_Upside"] < -0.10, "Adjusted_Score"] *= 0.25
+    scored.loc[
+        (scored["Valuation_Upside"] < -0.10) & ~broad_index_etf,
+        "Adjusted_Score",
+    ] *= 0.25
 
     raw_total = scored["Adjusted_Score"].sum()
     scored["Suggested_Allocation"] = budget * scored["Adjusted_Score"] / raw_total if raw_total > 0 else 0
@@ -556,6 +609,7 @@ with analysis_tab:
     thesis_status = str(row.get("Thesis_Status", "Not set"))
 
     is_etf = asset_class.lower() == "etf"
+    broad_index_etf = is_broad_index_etf(row)
     subject_label = "fund" if is_etf else "company"
     moat_label = "Exposure score" if is_etf else "Moat score"
     moat_trend_label = "Exposure trend" if is_etf else "Moat trend"
@@ -574,7 +628,11 @@ with analysis_tab:
         )
     
 
-    if valuation_upside > 0.20:
+    if broad_index_etf and valuation_upside <= 0:
+        reasons.append(
+            "This broad index ETF is eligible for recurring DCA; fair value is treated as context rather than a hard entry rule."
+        )
+    elif valuation_upside > 0.20:
         reasons.append(
             f"The {subject_label} trades materially below your fair-value estimate."
         )
@@ -728,10 +786,16 @@ with analysis_tab:
 
         if decision_status == "eligible":
             st.success("**Eligible for DCA**")
-            st.write(
-                "This position is below your fair-value estimate and remains "
-                "within its portfolio constraints."
-            )
+            if broad_index_etf and valuation_upside <= 0:
+                st.write(
+                    "This broad index ETF passes the hard rules and can be "
+                    "accumulated through regular DCA."
+                )
+            else:
+                st.write(
+                    "This position is below your fair-value estimate and remains "
+                    "within its portfolio constraints."
+                )
 
         elif decision_status == "hold":
             st.warning("**Hold / Wait**")
