@@ -1000,7 +1000,6 @@ with transactions_tab:
             "Quality_Score": quality_score,
             "Thesis_Status": "Watchlist",
             "Max_Weight": max_weight,
-            "Yahoo_Ticker": ticker or "TICKER",
         }])
 
         st.markdown("### Preview row")
@@ -1102,6 +1101,14 @@ with transactions_tab:
                 ["USD", "SGD"],
             )
 
+            fee = st.number_input(
+                "Estimated fee",
+                min_value=0.0,
+                value=0.0,
+                step=0.50,
+                format="%.2f",
+            )
+
         if transaction_mode == "New ticker":
             st.markdown("### Analysis inputs")
 
@@ -1181,6 +1188,11 @@ with transactions_tab:
                 )
 
         gross_amount = quantity * price
+        cash_impact = (
+            gross_amount + fee
+            if transaction_type == "BUY"
+            else max(0.0, gross_amount - fee)
+        )
 
         if transaction_type == "BUY":
             quantity_after = current_quantity + quantity
@@ -1208,6 +1220,8 @@ with transactions_tab:
             "Price": price,
             "Currency": currency,
             "Gross_Amount": gross_amount,
+            "Estimated_Fee": fee,
+            "Estimated_Cash_Impact": cash_impact,
             "Quantity_Before": current_quantity,
             "Quantity_After": quantity_after,
             "Average_Cost_Before": current_average_cost,
@@ -1220,6 +1234,8 @@ with transactions_tab:
                 "Quantity": "{:,.4f}",
                 "Price": "${:,.2f}",
                 "Gross_Amount": "${:,.2f}",
+                "Estimated_Fee": "${:,.2f}",
+                "Estimated_Cash_Impact": "${:,.2f}",
                 "Quantity_Before": "{:,.4f}",
                 "Quantity_After": "{:,.4f}",
                 "Average_Cost_Before": "${:,.2f}",
@@ -1227,6 +1243,11 @@ with transactions_tab:
             }),
             hide_index=True,
             use_container_width=True,
+        )
+
+        st.caption(
+            "Fees are shown as cash-impact context only. The current dashboard "
+            "does not calculate fee-adjusted cost basis, realized P/L, or taxes."
         )
 
         if transaction_type == "SELL":
