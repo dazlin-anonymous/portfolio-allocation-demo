@@ -436,11 +436,12 @@ missing = portfolio[portfolio["Current_Price"].isna()]
 if not missing.empty:
     st.warning("Market data could not be retrieved for: " + ", ".join(missing["Ticker"].tolist()))
 
-overview_tab, dca_tab, analysis_tab, research_tab = st.tabs(
+overview_tab, dca_tab, analysis_tab, transactions_tab, research_tab = st.tabs(
     [
         "Portfolio Overview",
         "DCA Allocation Engine",
         "Position Analysis",
+        "Transactions Demo",
         "Research Assumptions",
     ]
 )
@@ -883,6 +884,366 @@ with analysis_tab:
         hide_index=True,
         use_container_width=True
     )
+
+with transactions_tab:
+    st.subheader("Watchlist and transaction workflow")
+
+    st.caption(
+        "This public demo shows the workflow only. The final action buttons "
+        "are disabled and no sample CSV files are changed."
+    )
+
+    action = st.radio(
+        "Choose an action",
+        [
+            "Add to watchlist",
+            "Preview transaction",
+        ],
+        horizontal=True,
+    )
+
+    if action == "Add to watchlist":
+        st.caption(
+            "Preview how a research ticker would be added without buying it. "
+            "It would appear in Position Analysis and Research Assumptions, "
+            "but not in Portfolio Overview."
+        )
+
+        ticker = st.text_input(
+            "Ticker",
+            placeholder="e.g. SCHD",
+        ).strip().upper()
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            company_name = st.text_input(
+                "Company or fund name",
+                value=ticker,
+                placeholder="e.g. Schwab U.S. Dividend Equity ETF",
+            )
+
+            fair_value = st.number_input(
+                "Fair value",
+                min_value=0.0,
+                value=0.0,
+                step=1.0,
+                format="%.2f",
+            )
+
+            conviction = st.number_input(
+                "Conviction",
+                min_value=0,
+                max_value=10,
+                value=0,
+                step=1,
+            )
+
+        with c2:
+            position_type = st.selectbox(
+                "Position type",
+                POSITION_TYPE_OPTIONS,
+            )
+
+            moat_score = st.number_input(
+                "Moat score",
+                min_value=0,
+                max_value=10,
+                value=0,
+                step=1,
+            )
+
+            moat_trend = st.selectbox(
+                "Moat trend",
+                [
+                    "Strengthening",
+                    "Stable",
+                    "Unclear",
+                    "Weakening",
+                    "Cyclical",
+                ],
+            )
+
+        with c3:
+            quality_score = st.number_input(
+                "Quality score",
+                min_value=0,
+                max_value=10,
+                value=0,
+                step=1,
+            )
+
+            max_weight = st.number_input(
+                "Maximum weight",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.0,
+                step=0.01,
+                format="%.2f",
+            )
+
+            asset_class = st.selectbox(
+                "Asset class",
+                ["Stock", "ETF", "REIT"],
+            )
+
+        preview_name = company_name.strip() or ticker
+        watchlist_preview = pd.DataFrame([{
+            "Ticker": ticker or "TICKER",
+            "Name": preview_name or "Demo security",
+            "Asset_Class": asset_class,
+            "Conviction": conviction,
+            "Fair_Value": fair_value,
+            "Position_Type": position_type,
+            "Moat_Score": moat_score,
+            "Moat_Trend": moat_trend,
+            "Quality_Score": quality_score,
+            "Thesis_Status": "Watchlist",
+            "Max_Weight": max_weight,
+            "Yahoo_Ticker": ticker or "TICKER",
+        }])
+
+        st.markdown("### Preview row")
+        st.dataframe(
+            watchlist_preview.style.format({
+                "Fair_Value": "${:,.2f}",
+                "Max_Weight": "{:.1%}",
+            }),
+            hide_index=True,
+            use_container_width=True,
+        )
+
+        if ticker and ticker in master["Ticker"].astype(str).str.upper().values:
+            st.warning(
+                f"{ticker} already exists in the sample security master."
+            )
+
+        st.button(
+            "Add to watchlist",
+            type="primary",
+            disabled=True,
+            help="Disabled in the public demo. No CSV files are written.",
+        )
+
+    else:
+        st.caption(
+            "Preview the buy or sell math used by the personal dashboard. "
+            "The demo does not save transactions or update holdings."
+        )
+
+        transaction_mode = st.radio(
+            "Ticker type",
+            [
+                "Existing ticker",
+                "New ticker",
+            ],
+            horizontal=True,
+        )
+
+        if transaction_mode == "Existing ticker":
+            ticker = st.selectbox(
+                "Ticker",
+                sorted(
+                    master["Ticker"]
+                    .dropna()
+                    .astype(str)
+                    .unique()
+                ),
+            )
+            selected_holding = holdings[
+                holdings["Ticker"].astype(str).str.upper().eq(ticker.upper())
+            ]
+            current_quantity = (
+                safe_float(selected_holding["Quantity"].iloc[0])
+                if not selected_holding.empty
+                else 0.0
+            )
+            current_average_cost = (
+                safe_float(selected_holding["Average_Cost"].iloc[0])
+                if not selected_holding.empty
+                else 0.0
+            )
+        else:
+            ticker = st.text_input(
+                "Ticker",
+                placeholder="e.g. SCHD",
+                key="demo_new_transaction_ticker",
+            ).strip().upper()
+            current_quantity = 0.0
+            current_average_cost = 0.0
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            transaction_type = st.selectbox(
+                "Transaction type",
+                ["BUY", "SELL"],
+            )
+
+            quantity = st.number_input(
+                "Quantity",
+                min_value=0.0001,
+                value=1.0,
+                step=0.1,
+                format="%.4f",
+            )
+
+        with c2:
+            price = st.number_input(
+                "Transaction price per unit",
+                min_value=0.0,
+                value=0.0,
+                step=1.0,
+                format="%.2f",
+            )
+
+            currency = st.selectbox(
+                "Currency",
+                ["USD", "SGD"],
+            )
+
+        if transaction_mode == "New ticker":
+            st.markdown("### Analysis inputs")
+
+            i1, i2, i3 = st.columns(3)
+
+            with i1:
+                st.number_input(
+                    "Fair value",
+                    min_value=0.0,
+                    value=0.0,
+                    step=1.0,
+                    format="%.2f",
+                    key="demo_new_fair_value",
+                )
+
+                st.number_input(
+                    "Conviction",
+                    min_value=0,
+                    max_value=10,
+                    value=5,
+                    step=1,
+                    key="demo_new_conviction",
+                )
+
+                st.selectbox(
+                    "Position type",
+                    POSITION_TYPE_OPTIONS,
+                    key="demo_new_position_type",
+                )
+
+            with i2:
+                st.number_input(
+                    "Moat score",
+                    min_value=0,
+                    max_value=10,
+                    value=5,
+                    step=1,
+                    key="demo_new_moat_score",
+                )
+
+                st.selectbox(
+                    "Moat trend",
+                    [
+                        "Strengthening",
+                        "Stable",
+                        "Unclear",
+                        "Weakening",
+                        "Cyclical",
+                    ],
+                    key="demo_new_moat_trend",
+                )
+
+                st.number_input(
+                    "Quality score",
+                    min_value=0,
+                    max_value=10,
+                    value=5,
+                    step=1,
+                    key="demo_new_quality_score",
+                )
+
+            with i3:
+                st.number_input(
+                    "Maximum weight",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.05,
+                    step=0.01,
+                    format="%.2f",
+                    key="demo_new_max_weight",
+                )
+
+                st.selectbox(
+                    "Asset class",
+                    ["Stock", "ETF", "REIT"],
+                    key="demo_new_asset_class",
+                )
+
+        gross_amount = quantity * price
+
+        if transaction_type == "BUY":
+            quantity_after = current_quantity + quantity
+            average_cost_after = (
+                (
+                    current_quantity * current_average_cost
+                    + quantity * price
+                )
+                / quantity_after
+                if quantity_after > 0
+                else 0.0
+            )
+        else:
+            quantity_after = max(0.0, current_quantity - quantity)
+            average_cost_after = (
+                current_average_cost
+                if quantity_after > 0
+                else 0.0
+            )
+
+        preview = pd.DataFrame([{
+            "Ticker": ticker or "TICKER",
+            "Transaction_Type": transaction_type,
+            "Quantity": quantity,
+            "Price": price,
+            "Currency": currency,
+            "Gross_Amount": gross_amount,
+            "Quantity_Before": current_quantity,
+            "Quantity_After": quantity_after,
+            "Average_Cost_Before": current_average_cost,
+            "Average_Cost_After": average_cost_after,
+        }])
+
+        st.markdown("### Transaction preview")
+        st.dataframe(
+            preview.style.format({
+                "Quantity": "{:,.4f}",
+                "Price": "${:,.2f}",
+                "Gross_Amount": "${:,.2f}",
+                "Quantity_Before": "{:,.4f}",
+                "Quantity_After": "{:,.4f}",
+                "Average_Cost_Before": "${:,.2f}",
+                "Average_Cost_After": "${:,.2f}",
+            }),
+            hide_index=True,
+            use_container_width=True,
+        )
+
+        if transaction_type == "SELL":
+            if transaction_mode == "New ticker":
+                st.warning("A new ticker cannot be sold before it exists.")
+            elif quantity > current_quantity:
+                st.warning(
+                    f"Cannot sell {quantity:.4f} units in the personal app. "
+                    f"The sample holding has {current_quantity:.4f} units."
+                )
+
+        st.button(
+            "Save transaction",
+            type="primary",
+            disabled=True,
+            help="Disabled in the public demo. No holdings or ledger files are written.",
+        )
 
 with research_tab:
     st.subheader("Research Assumptions")
