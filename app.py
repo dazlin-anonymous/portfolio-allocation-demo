@@ -551,8 +551,15 @@ with analysis_tab:
     quality_score = int(safe_float(row.get("Quality_Score", 0)))
 
     position_type = str(row.get("Position_Type", "Not set"))
+    asset_class = str(row.get("Asset_Class", "")).strip()
     moat_trend = str(row.get("Moat_Trend", "Not set"))
     thesis_status = str(row.get("Thesis_Status", "Not set"))
+
+    is_etf = asset_class.lower() == "etf"
+    subject_label = "fund" if is_etf else "company"
+    moat_label = "Exposure score" if is_etf else "Moat score"
+    moat_trend_label = "Exposure trend" if is_etf else "Moat trend"
+    quality_label = "Exposure quality" if is_etf else "Business quality"
 
     current_weight = safe_float(row.get("Current_Weight", 0))
     max_weight = safe_float(row.get("Max_Weight", 0))
@@ -569,15 +576,15 @@ with analysis_tab:
 
     if valuation_upside > 0.20:
         reasons.append(
-            "The stock trades materially below your fair-value estimate."
+            f"The {subject_label} trades materially below your fair-value estimate."
         )
     elif valuation_upside > 0:
         reasons.append(
-            "The stock trades below your fair-value estimate."
+            f"The {subject_label} trades below your fair-value estimate."
         )
     else:
         warnings.append(
-            "The stock trades at or above your fair-value estimate."
+            f"The {subject_label} trades at or above your fair-value estimate."
         )
 
     if average_cost > 0 and live_price > 0:
@@ -600,31 +607,51 @@ with analysis_tab:
         )
 
     if moat_score >= 8:
-        reasons.append(
-            "The holding has strong structural advantages."
-        )
+        if is_etf:
+            reasons.append(
+                "The ETF has attractive structural exposure."
+            )
+        else:
+            reasons.append(
+                "The company has a strong competitive moat."
+            )
     elif moat_score <= 4:
-        warnings.append(
-            "The moat or structural advantage appears limited or uncertain."
-        )
+        if is_etf:
+            warnings.append(
+                "The ETF exposure appears limited or uncertain."
+            )
+        else:
+            warnings.append(
+                "The competitive moat appears limited or uncertain."
+            )
 
     if quality_score >= 8:
         reasons.append(
-            "Quality is rated highly."
+            f"{quality_label} is rated highly."
         )
     elif quality_score <= 4:
         warnings.append(
-            "Quality is rated relatively low."
+            f"{quality_label} is rated relatively low."
         )
 
     if moat_trend.lower() == "weakening":
-        warnings.append(
-            "The moat or structural advantage is marked as weakening."
-        )
+        if is_etf:
+            warnings.append(
+                "The ETF exposure trend is marked as weakening."
+            )
+        else:
+            warnings.append(
+                "The competitive moat is marked as weakening."
+            )
     elif moat_trend.lower() == "strengthening":
-        reasons.append(
-            "The moat or structural advantage appears to be strengthening."
-        )
+        if is_etf:
+            reasons.append(
+                "The ETF exposure trend appears to be improving."
+            )
+        else:
+            reasons.append(
+                "The competitive moat appears to be strengthening."
+            )
     
     decision_status = dca_decision_status(row)
 
@@ -671,9 +698,9 @@ with analysis_tab:
             "Factor": [
                 "Position type",
                 "Conviction",
-                "Moat score",
-                "Moat trend",
-                "Quality score",
+                moat_label,
+                moat_trend_label,
+                quality_label,
                 "Thesis status",
                 "Current weight",
                 "Maximum weight",
@@ -708,10 +735,16 @@ with analysis_tab:
 
         elif decision_status == "hold":
             st.warning("**Hold / Wait**")
-            st.write(
-                "The holding remains acceptable, but the current price is "
-                "at or above your fair-value estimate. Wait for a better entry."
-            )
+            if is_etf:
+                st.write(
+                    "The fund exposure remains acceptable, but the current price is "
+                    "at or above your fair-value estimate. Wait for a better entry."
+                )
+            else:
+                st.write(
+                    "The business remains acceptable, but the current price is "
+                    "at or above your fair-value estimate. Wait for a better entry."
+                )
 
         else:
             st.error("**Do not add**")
