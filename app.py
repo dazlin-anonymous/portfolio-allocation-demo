@@ -30,17 +30,23 @@ BLOCKED_THESIS_STATUSES = {
 POSITION_TYPE_OPTIONS = [
     "Core",
     "Compounder",
+    "Growth",
     "Value",
-    "ETF / Thematic",
+    "Thematic / Satellite",
     "Speculative",
 ]
 
 POSITION_TYPE_CAPS = {
     "speculative": 0.05,
-    "etf / thematic": 0.15,
+    "thematic / satellite": 0.15,
     "value": 0.25,
+    "growth": 0.30,
     "compounder": 0.40,
     "core": 1.0,
+}
+
+POSITION_TYPE_ALIASES = {
+    "etf / thematic": "Thematic / Satellite",
 }
 
 BROAD_INDEX_ETF_TICKERS = {
@@ -86,6 +92,11 @@ def safe_float(value, default: float = 0.0) -> float:
 
 def normalize_text(value: object) -> str:
     return str(value or "").strip().lower()
+
+
+def normalize_position_type(value: object) -> str:
+    text = str(value or "").strip()
+    return POSITION_TYPE_ALIASES.get(normalize_text(text), text)
 
 
 def is_etf(row: pd.Series) -> bool:
@@ -249,6 +260,7 @@ def load_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
         holdings[col] = pd.to_numeric(holdings[col], errors="coerce").fillna(0)
     for col in numeric_master:
         master[col] = pd.to_numeric(master[col], errors="coerce")
+    master["Position_Type"] = master["Position_Type"].apply(normalize_position_type)
     return holdings, master
 
 def build_security_universe(
@@ -341,7 +353,8 @@ def moat_trend_score(value: str) -> float:
 
 
 def position_type_cap(position_type: str) -> float:
-    return POSITION_TYPE_CAPS.get(normalize_text(position_type), 0.20)
+    normalized_position_type = normalize_position_type(position_type)
+    return POSITION_TYPE_CAPS.get(normalize_text(normalized_position_type), 0.20)
 
 
 def build_dca_recommendation(df: pd.DataFrame, budget: float) -> pd.DataFrame:
