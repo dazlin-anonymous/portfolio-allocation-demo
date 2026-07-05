@@ -463,21 +463,185 @@ with overview_tab:
     total_value = portfolio["Market_Value"].sum()
     total_cost = portfolio["Cost_Basis"].sum()
     total_pl = total_value - total_cost
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Portfolio value", f"${total_value:,.2f}")
-    c2.metric("Cost basis", f"${total_cost:,.2f}")
-    c3.metric("Unrealized P/L", f"${total_pl:,.2f}", f"{total_pl / total_cost:.1%}" if total_cost else None)
+    total_return = total_pl / total_cost if total_cost else 0
+    holding_count = len(portfolio)
+    sorted_portfolio = portfolio.sort_values("Market_Value", ascending=False).copy()
+    top_position = (
+        str(sorted_portfolio.iloc[0]["Ticker"])
+        if not sorted_portfolio.empty
+        else "N/A"
+    )
+    top_position_weight = (
+        safe_float(sorted_portfolio.iloc[0].get("Current_Weight", 0))
+        if not sorted_portfolio.empty
+        else 0
+    )
+    top_3_weight = sorted_portfolio["Current_Weight"].head(3).sum()
+    overweight_mask = (
+        (portfolio["Max_Weight"] > 0)
+        & (portfolio["Current_Weight"] >= portfolio["Max_Weight"])
+    )
+    overweight_count = int(overweight_mask.sum())
+    etf_weight = portfolio.loc[
+        portfolio["Asset_Class"].astype(str).str.lower().eq("etf"),
+        "Current_Weight",
+    ].sum()
+    single_name_weight = max(0.0, 1 - etf_weight)
 
-    chart_col, table_col = st.columns([1, 1.6])
+    st.markdown("### Allocation Snapshot")
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Portfolio value", f"${total_value:,.2f}")
+    k2.metric("Cost basis", f"${total_cost:,.2f}")
+    k3.metric("Unrealized P/L", f"${total_pl:,.2f}")
+    k4.metric("Return", f"{total_return:.1%}")
+    k5.metric("Holdings", holding_count)
+
+    st.markdown("### Allocation Health")
+    h1, h2, h3, h4 = st.columns(4)
+    h1.metric("Largest position", top_position, f"{top_position_weight:.1%}")
+    h2.metric("Top 3 concentration", f"{top_3_weight:.1%}")
+    h3.metric("ETF / fund exposure", f"{etf_weight:.1%}")
+    h4.metric("At or above max", overweight_count)
+
+    chart_col, exposure_col = st.columns([1.15, 1])
     with chart_col:
-        fig = px.pie(portfolio, values="Market_Value", names="Ticker", title="Allocation by ticker", hole=0.45)
-        st.plotly_chart(fig, use_container_width=True)
-    with table_col:
-        display = portfolio[["Ticker", "Quantity", "Average_Cost", "Current_Price", "Market_Value", "Current_Weight", "Unrealized_PL", "Unrealized_Return"]].copy()
-        st.dataframe(display.style.format({
-            "Quantity": "{:,.4f}", "Average_Cost": "${:,.2f}", "Current_Price": "${:,.2f}", "Market_Value": "${:,.2f}",
-            "Current_Weight": "{:.1%}", "Unrealized_PL": "${:,.2f}", "Unrealized_Return": "{:.1%}"
-        }), use_container_width=True, hide_index=True)
+        allocation_fig = px.pie(
+            sorted_portfolio,
+            values="Market_Value",
+            names="Ticker",
+            hole=0.58,
+            title="Allocation by holding",
+        )
+        allocation_fig.update_traces(
+            textposition="inside",
+            textinfo="percent+label",
+            hovertemplate="%{label}<br>$%{value:,.2f}<br>%{percent}<extra></extra>",
+        )
+        allocation_fig.update_layout(
+            margin=dict(l=10, r=10, t=45, b=10),
+            legend_title_text="",
+        )
+        st.plotly_chart(allocation_fig, use_container_width=True)
+
+    with exposure_col:
+        exposure = (
+            portfolio.groupby("Position_Type", as_index=False)["Market_Value"]
+            .sum()
+            .sort_values("Market_Value", ascending=True)
+        )
+        exposure["Weight"] = (
+            exposure["Market_Value"] / total_value
+            if total_value
+            else 0
+        )
+        exposure["Weight_Label"] = exposure["Weight"].map(lambda value: f"{value:.1%}")
+        exposure_fig = px.bar(
+            exposure,
+            x="Weight",
+            y="Position_Type",
+            orientation="h",
+            text="Weight_Label",
+            title="Exposure by position type",
+        )
+        exposure_fig.update_traces(
+            textposition="outside",
+            hovertemplate="%{y}<br>%{x:.1%}<extra></extra>",
+        )
+        exposure_fig.update_xaxes(tickformat=".0%", range=[0, max(0.05, exposure["Weight"].max() * 1.18)])
+        exposure_fig.update_yaxes(title="")
+        exposure_fig.update_layout(
+            margin=dict(l=10, r=40, t=45, b=10),
+            xaxis_title="Portfolio weight",
+            showlegend=False,
+        )
+        st.plotly_chart(exposure_fig, use_container_width=True)
+
+    st.markdown("### Portfolio Health")
+    risk_col, winner_col, mix_col = st.columns([1, 1, 0.9])
+
+    with risk_col:
+        st.markdown("#### Weight constraints")
+        if overweight_count:
+            risk_display = portfolio.loc[
+                overweight_mask,
+                ["Ticker", "Current_Weight", "Max_Weight"],
+            ].sort_values("Current_Weight", ascending=False)
+            st.dataframe(
+                risk_display.rename(columns={
+                    "Current_Weight": "Weight",
+                    "Max_Weight": "Max",
+                }).style.format({
+                    "Weight": "{:.1%}",
+                    "Max": "{:.1%}",
+                }),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No positions are at or above their maximum weight.")
+
+    with winner_col:
+        st.markdown("#### Winners and laggards")
+        movers = portfolio[
+            ["Ticker", "Unrealized_PL", "Unrealized_Return"]
+        ].sort_values("Unrealized_PL")
+        movers_display = pd.concat([
+            movers.head(2),
+            movers.tail(2).sort_values("Unrealized_PL", ascending=False),
+        ]).drop_duplicates("Ticker")
+        st.dataframe(
+            movers_display.style.format({
+                "Unrealized_PL": "${:,.2f}",
+                "Unrealized_Return": "{:.1%}",
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    with mix_col:
+        st.markdown("#### Portfolio mix")
+        mix_df = pd.DataFrame({
+            "Exposure": ["Single-name", "ETF / fund"],
+            "Weight": [single_name_weight, etf_weight],
+        })
+        st.dataframe(
+            mix_df.style.format({"Weight": "{:.1%}"}),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("### Holdings Detail")
+    display = sorted_portfolio[
+        [
+            "Ticker",
+            "Quantity",
+            "Average_Cost",
+            "Current_Price",
+            "Market_Value",
+            "Current_Weight",
+            "Max_Weight",
+            "Unrealized_PL",
+            "Unrealized_Return",
+        ]
+    ].rename(columns={
+        "Average_Cost": "Avg cost",
+        "Current_Price": "Price",
+        "Market_Value": "Market value",
+        "Current_Weight": "Weight",
+        "Max_Weight": "Max",
+        "Unrealized_PL": "Unrealized P/L",
+        "Unrealized_Return": "Return",
+    })
+    st.dataframe(display.style.format({
+        "Quantity": "{:,.4f}",
+        "Avg cost": "${:,.2f}",
+        "Price": "${:,.2f}",
+        "Market value": "${:,.2f}",
+        "Weight": "{:.1%}",
+        "Max": "{:.1%}",
+        "Unrealized P/L": "${:,.2f}",
+        "Return": "{:.1%}",
+    }), use_container_width=True, hide_index=True)
 
 with dca_tab:
     st.subheader("Monthly DCA recommendation")
