@@ -528,35 +528,67 @@ with dca_tab:
         if post_dca_total
         else 0
     )
-    a1, a2 = st.columns(2)
+    a1, a2, a3 = st.columns(3)
     a1.metric("Recommended purchases", f"${allocated:,.2f}")
     a2.metric("Remain as cash", f"${cash:,.2f}")
-    rec_display = rec[
+    a3.metric("Eligible positions", int((rec["Suggested_Allocation"] > 0).sum()))
+
+    primary_display = rec[
         [
             "Ticker",
             "Position_Type",
-            "Conviction",
-            "Current_Weight",
-            "Max_Weight",
-            "Average_Cost",
             "Current_Price",
-            "Cost_Basis_Discount",
-            "Valuation_Upside",
-            "Position_In_52W_Range",
-            "Moat_Score",
-            "Moat_Trend",
-            "Quality_Score",
-            "Cost_Basis_Component",
-            "Business_Quality_Multiplier",
-            "Adjusted_Score",
             "Suggested_Allocation",
             "Shares_To_Buy",
             "Executable_Amount",
             "Unallocated_Due_To_Rounding",
+            "Current_Weight",
             "Post_DCA_Weight",
         ]
-    ]
-    st.dataframe(rec_display.style.format({
+    ].copy()
+
+    primary_display = primary_display.rename(columns={
+        "Position_Type": "Type",
+        "Current_Price": "Price",
+        "Suggested_Allocation": "Suggested",
+        "Shares_To_Buy": "Units",
+        "Executable_Amount": "Executable",
+        "Unallocated_Due_To_Rounding": "Cash leftover",
+        "Current_Weight": "Weight now",
+        "Post_DCA_Weight": "Weight after",
+    })
+
+    st.dataframe(primary_display.style.format({
+        "Price": "${:,.2f}",
+        "Suggested": "${:,.2f}",
+        "Units": "{:,.4f}" if fractional_allowed else "{:,.0f}",
+        "Executable": "${:,.2f}",
+        "Cash leftover": "${:,.2f}",
+        "Weight now": "{:.1%}",
+        "Weight after": "{:.1%}",
+    }), use_container_width=True, hide_index=True)
+
+    with st.expander("Show scoring details"):
+        detail_display = rec[
+            [
+                "Ticker",
+                "Conviction",
+                "Current_Weight",
+                "Max_Weight",
+                "Average_Cost",
+                "Current_Price",
+                "Cost_Basis_Discount",
+                "Valuation_Upside",
+                "Position_In_52W_Range",
+                "Moat_Score",
+                "Moat_Trend",
+                "Quality_Score",
+                "Cost_Basis_Component",
+                "Business_Quality_Multiplier",
+                "Adjusted_Score",
+            ]
+        ]
+        st.dataframe(detail_display.style.format({
         "Current_Weight": "{:.1%}",
         "Max_Weight": "{:.1%}",
         "Average_Cost": "${:,.2f}",
@@ -567,12 +599,7 @@ with dca_tab:
         "Cost_Basis_Component": "{:.3f}",
         "Business_Quality_Multiplier": "{:.2f}",
         "Adjusted_Score": "{:.3f}",
-        "Suggested_Allocation": "${:,.2f}",
-        "Shares_To_Buy": "{:,.4f}" if fractional_allowed else "{:,.0f}",
-        "Executable_Amount": "${:,.2f}",
-        "Unallocated_Due_To_Rounding": "${:,.2f}",
-        "Post_DCA_Weight": "{:.1%}",
-    }), use_container_width=True, hide_index=True)
+        }), use_container_width=True, hide_index=True)
     st.info("The recommendation is decision support, not an automatic trade instruction. Review fair values, thesis changes, position-specific risks, and upcoming market events before placing orders.")
 
 with analysis_tab:
